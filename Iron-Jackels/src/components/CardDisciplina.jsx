@@ -16,7 +16,11 @@ function CardDisciplina({ disciplina }) {
       style={{ borderColor: disciplina.color }}
     >
       <div className="card-body text-center">
-        <img src={disciplina.imagen} className="logo" alt={disciplina.nombre} />
+        <img
+          src={disciplina.imagenUrl}
+          className="logo"
+          alt={disciplina.nombre}
+        />
 
         <h5 className="text-white mt-3">{disciplina.nombre}</h5>
 
