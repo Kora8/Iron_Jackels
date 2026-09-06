@@ -1,16 +1,9 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 
-import { disciplinas } from "../data/disciplinas";
-import { agregarMovimiento } from "../data/movimientos";
-
-import {
-  finalidades,
-  dificultades,
-  modosEntrenamiento,
-} from "../data/opcionesFormulario";
-
 import Select from "./Select";
+
+const API_URL = "http://localhost:3000/api";
 
 function CrearMovimiento() {
   const navigate = useNavigate();
@@ -22,10 +15,27 @@ function CrearMovimiento() {
     finalidad: "",
     dificultad: "",
     modo: "",
-    media: "",
-    mediaType: "",
-    mediaName: "",
+    archivo: null,
   });
+  const [opciones, setOpciones] = useState({
+    disciplinas: [],
+    finalidades: [],
+    dificultades: [],
+    modosEntrenamiento: [],
+  });
+  const [vistaPrevia, setVistaPrevia] = useState("");
+  const [error, setError] = useState("");
+  const [guardando, setGuardando] = useState(false);
+
+  useEffect(() => {
+    fetch(`${API_URL}/disciplinas/opciones-movimiento`)
+      .then((response) => {
+        if (!response.ok) throw new Error("No se pudieron cargar las opciones");
+        return response.json();
+      })
+      .then(setOpciones)
+      .catch((err) => setError(err.message));
+  }, []);
 
   const cambiarValor = (e) => {
     const { name, value } = e.target;
@@ -41,35 +51,13 @@ function CrearMovimiento() {
   };
 
   const cambiarArchivo = (e) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    const lector = new FileReader();
-
-    lector.onload = () => {
-      const resultado = typeof lector.result === "string" ? lector.result : "";
-
-      setFormulario((prev) => ({
-        ...prev,
-        media: resultado,
-        mediaType: file.type,
-        mediaName: file.name,
-      }));
-    };
-
-    lector.onerror = () => {
-      setFormulario((prev) => ({
-        ...prev,
-        media: "",
-        mediaType: "",
-        mediaName: "",
-      }));
-    };
-
-    lector.readAsDataURL(file);
+    const archivo = e.target.files?.[0];
+    if (!archivo) return;
+    setFormulario((prev) => ({ ...prev, archivo }));
+    setVistaPrevia(URL.createObjectURL(archivo));
   };
 
-  const disciplinaSeleccionada = disciplinas.find(
+  const disciplinaSeleccionada = opciones.disciplinas.find(
     (d) => d.id === Number(formulario.disciplina),
   );
 
@@ -82,31 +70,36 @@ function CrearMovimiento() {
     formulario.finalidad,
     formulario.dificultad,
     formulario.modo,
-    formulario.media,
+    formulario.archivo,
   ].every((valor) => Boolean(valor && String(valor).trim()));
 
-  const aceptar = () => {
+  const aceptar = async () => {
     if (!formularioCompleto) return;
+    setGuardando(true);
+    setError("");
+    const formData = new FormData();
+    formData.append("nombre", formulario.nombre);
+    formData.append("disciplina_id", formulario.disciplina);
+    formData.append("tipo_movimiento_id", formulario.tipo);
+    formData.append("finalidad_id", formulario.finalidad);
+    formData.append("dificultad_id", formulario.dificultad);
+    formData.append("modo_entrenamiento_id", formulario.modo);
+    formData.append("media", formulario.archivo);
 
-    const disciplinaSeleccionada = disciplinas.find(
-      (disciplina) => disciplina.id === Number(formulario.disciplina),
-    );
-
-    agregarMovimiento({
-      id: Date.now(),
-      nombre: formulario.nombre,
-      disciplinaSlug: slug || disciplinaSeleccionada?.slug,
-      disciplinaNombre: disciplinaSeleccionada?.nombre || "Disciplina",
-      tipo: formulario.tipo,
-      finalidad: formulario.finalidad,
-      dificultad: formulario.dificultad,
-      modo: formulario.modo,
-      media: formulario.media,
-      mediaType: formulario.mediaType,
-      mediaName: formulario.mediaName,
-    });
-
-    navigate(`/disciplinas/${slug || disciplinaSeleccionada?.slug}/lista`);
+    try {
+      const response = await fetch(`${API_URL}/movimientos`, {
+        method: "POST",
+        body: formData,
+      });
+      const datos = await response.json();
+      if (!response.ok)
+        throw new Error(datos.mensaje || "No se pudo guardar el movimiento");
+      navigate(`/disciplinas/${slug || disciplinaSeleccionada?.slug}/lista`);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setGuardando(false);
+    }
   };
 
   const cancelar = () => {
@@ -142,7 +135,7 @@ function CrearMovimiento() {
         name="disciplina"
         value={formulario.disciplina}
         onChange={cambiarValor}
-        options={disciplinas.map((d) => ({
+        options={opciones.disciplinas.map((d) => ({
           value: d.id,
           label: d.nombre,
         }))}
@@ -154,8 +147,8 @@ function CrearMovimiento() {
         value={formulario.tipo}
         onChange={cambiarValor}
         options={tiposMovimiento.map((tipo) => ({
-          value: tipo,
-          label: tipo,
+          value: tipo.id,
+          label: tipo.nombre,
         }))}
       />
 
@@ -164,9 +157,9 @@ function CrearMovimiento() {
         name="finalidad"
         value={formulario.finalidad}
         onChange={cambiarValor}
-        options={finalidades.map((f) => ({
-          value: f,
-          label: f,
+        options={opciones.finalidades.map((f) => ({
+          value: f.id,
+          label: f.nombre,
         }))}
       />
 
@@ -175,9 +168,9 @@ function CrearMovimiento() {
         name="dificultad"
         value={formulario.dificultad}
         onChange={cambiarValor}
-        options={dificultades.map((d) => ({
-          value: d,
-          label: d,
+        options={opciones.dificultades.map((d) => ({
+          value: d.id,
+          label: d.nombre,
         }))}
       />
 
@@ -186,17 +179,18 @@ function CrearMovimiento() {
         name="modo"
         value={formulario.modo}
         onChange={cambiarValor}
-        options={modosEntrenamiento.map((m) => ({
-          value: m,
-          label: m,
+        options={opciones.modosEntrenamiento.map((m) => ({
+          value: m.id,
+          label: m.nombre,
         }))}
       />
 
       <div className="d-flex gap-2 mt-4">
+        {error && <div className="alert alert-danger w-100 mb-0">{error}</div>}
         <button
           className="btn btn-success"
           onClick={aceptar}
-          disabled={!formularioCompleto}
+          disabled={!formularioCompleto || guardando}
         >
           Aceptar
         </button>
@@ -204,6 +198,22 @@ function CrearMovimiento() {
           Cancelar
         </button>
       </div>
+      {vistaPrevia && formulario.archivo?.type.startsWith("image/") && (
+        <img
+          className="img-fluid mt-3"
+          src={vistaPrevia}
+          alt="Vista previa"
+          style={{ maxHeight: 240 }}
+        />
+      )}
+      {vistaPrevia && formulario.archivo?.type.startsWith("video/") && (
+        <video
+          className="img-fluid mt-3"
+          src={vistaPrevia}
+          controls
+          style={{ maxHeight: 240 }}
+        />
+      )}
     </div>
   );
 }

@@ -1,29 +1,46 @@
-import { useMemo } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { disciplinas } from "../data/disciplinas";
-import { obtenerMovimientos } from "../data/movimientos";
+
+const API_URL = "http://localhost:3000/api";
 
 function ListaMovimientos() {
   const navigate = useNavigate();
   const { slug } = useParams();
+  const [disciplinas, setDisciplinas] = useState([]);
+  const [movimientos, setMovimientos] = useState([]);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    Promise.all([
+      fetch(`${API_URL}/disciplinas`).then((response) => response.json()),
+      fetch(`${API_URL}/movimientos`).then((response) => response.json()),
+    ])
+      .then(([disciplinasApi, movimientosApi]) => {
+        setDisciplinas(disciplinasApi);
+        setMovimientos(
+          movimientosApi.filter(
+            (movimiento) => movimiento.disciplinaSlug === slug,
+          ),
+        );
+      })
+      .catch(() => setError("No se pudieron cargar los movimientos"));
+  }, [slug]);
 
   const tieneMediaValida = (media) =>
     typeof media === "string" &&
     media.trim() !== "" &&
     !media.startsWith("blob:");
 
-  const disciplina = useMemo(
-    () => disciplinas.find((item) => item.slug === slug),
-    [slug],
-  );
+  const disciplina = disciplinas.find((item) => item.slug === slug);
 
-  const movimientos = useMemo(() => obtenerMovimientos(slug), [slug]);
+  const mediaUrl = (media) =>
+    media?.startsWith("http") ? media : `http://localhost:3000${media}`;
 
   return (
     <div className="container py-4 text-light">
       <div className="d-flex align-items-center gap-3 mb-4">
         <img
-          src={disciplina?.imagen}
+          src={disciplina?.imagenUrl}
           alt={disciplina?.nombre}
           width="70"
           height="70"
@@ -36,6 +53,7 @@ function ListaMovimientos() {
         </div>
       </div>
 
+      {error && <div className="alert alert-danger">{error}</div>}
       <div className="row g-4">
         {movimientos.length === 0 ? (
           <div className="col-12">
@@ -50,18 +68,17 @@ function ListaMovimientos() {
                 className="card h-100 border-0"
                 style={{ background: "#111", color: "#fff" }}
               >
-                {tieneMediaValida(movimiento.media) &&
-                movimiento.mediaType?.startsWith("video") ? (
+                {tieneMediaValida(movimiento.mediaUrl) &&
+                /\.(mp4|webm)$/i.test(movimiento.mediaUrl) ? (
                   <video
                     className="card-img-top"
                     controls
-                    src={movimiento.media}
+                    src={mediaUrl(movimiento.mediaUrl)}
                   />
-                ) : tieneMediaValida(movimiento.media) &&
-                  movimiento.mediaType?.startsWith("image") ? (
+                ) : tieneMediaValida(movimiento.mediaUrl) ? (
                   <img
                     className="card-img-top"
-                    src={movimiento.media}
+                    src={mediaUrl(movimiento.mediaUrl)}
                     alt={movimiento.nombre}
                   />
                 ) : (
