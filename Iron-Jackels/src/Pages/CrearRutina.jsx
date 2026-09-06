@@ -1,7 +1,5 @@
-import { useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { disciplinas } from "../data/disciplinas";
-import { obtenerMovimientos } from "../data/movimientos";
 import { guardarRutina } from "../data/rutinas";
 
 const etapas = [
@@ -14,6 +12,9 @@ function CrearRutina() {
   const navigate = useNavigate();
   const { slug } = useParams();
   const [nombreRutina, setNombreRutina] = useState("");
+  const [movimientosDisponibles, setMovimientosDisponibles] = useState([]);
+  const [cargandoMovimientos, setCargandoMovimientos] = useState(true);
+  const [errorMovimientos, setErrorMovimientos] = useState("");
   const [seleccionados, setSeleccionados] = useState([]);
   const [asignaciones, setAsignaciones] = useState({
     calentamiento: [],
@@ -21,25 +22,50 @@ function CrearRutina() {
     acondicionamiento: [],
   });
 
-  const movimientos = useMemo(() => {
-    const base = obtenerMovimientos(slug);
+  useEffect(() => {
+    const cargarMovimientos = async () => {
+      setCargandoMovimientos(true);
+      setErrorMovimientos("");
 
-    if (slug === "mma") {
-      return [
-        ...base,
-        ...disciplinas
-          .filter((disciplina) => disciplina.slug !== "mma")
-          .flatMap((disciplina) =>
-            obtenerMovimientos(disciplina.slug).map((movimiento) => ({
-              ...movimiento,
-              disciplinaOrigen: disciplina.nombre,
-            })),
-          ),
-      ];
-    }
+      try {
+        const response = await fetch("http://localhost:3000/api/movimientos");
+        if (!response.ok) {
+          throw new Error(`La API respondió con estado ${response.status}`);
+        }
 
-    return base;
-  }, [slug]);
+        const data = await response.json();
+        if (!Array.isArray(data)) {
+          throw new Error("La respuesta de movimientos no es un array");
+        }
+
+        setMovimientosDisponibles(data);
+      } catch (error) {
+        console.error("Error al cargar movimientos:", error);
+        setErrorMovimientos("No se pudieron cargar los movimientos.");
+        setMovimientosDisponibles([]);
+      } finally {
+        setCargandoMovimientos(false);
+      }
+    };
+
+    cargarMovimientos();
+  }, []);
+
+  const movimientos = movimientosDisponibles
+    .filter((movimiento) => {
+      if (slug === "mma") return true;
+      return movimiento.disciplinaSlug === slug;
+    })
+    .map((movimiento) => {
+      if (!movimiento.disciplinaOrigen && movimiento.disciplinaNombre) {
+        return {
+          ...movimiento,
+          disciplinaOrigen: movimiento.disciplinaNombre,
+        };
+      }
+
+      return movimiento;
+    });
 
   const agregarMovimiento = (movimiento) => {
     if (seleccionados.some((item) => item.id === movimiento.id)) return;
@@ -114,22 +140,26 @@ function CrearRutina() {
 
       <div className="mb-4">
         <h5>Movimientos disponibles</h5>
-        <div className="row g-3">
-          {movimientos.map((movimiento) => (
-            <div className="col-md-4" key={movimiento.id}>
-              <div className="border rounded p-3">
-                <strong>{movimiento.nombre}</strong>
-                <p className="text-secondary small mb-2">{movimiento.tipo}</p>
-                <button
-                  className="btn btn-outline-light btn-sm"
-                  onClick={() => agregarMovimiento(movimiento)}
-                >
-                  Añadir
-                </button>
+        {cargandoMovimientos && <p>Cargando movimientos...</p>}
+        {errorMovimientos && <p className="text-danger">{errorMovimientos}</p>}
+        {!cargandoMovimientos && !errorMovimientos && (
+          <div className="row g-3">
+            {movimientos.map((movimiento) => (
+              <div className="col-md-4" key={movimiento.id}>
+                <div className="border rounded p-3">
+                  <strong>{movimiento.nombre}</strong>
+                  <p className="text-secondary small mb-2">{movimiento.tipo}</p>
+                  <button
+                    className="btn btn-outline-light btn-sm"
+                    onClick={() => agregarMovimiento(movimiento)}
+                  >
+                    Añadir
+                  </button>
+                </div>
               </div>
-            </div>
-          ))}
-        </div>
+            ))}
+          </div>
+        )}
       </div>
 
       <div className="mb-4">
