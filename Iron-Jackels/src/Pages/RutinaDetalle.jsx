@@ -3,14 +3,44 @@ import { useNavigate, useParams } from "react-router-dom";
 import { disciplinas } from "../data/disciplinas";
 import { obtenerRutinas } from "../data/rutinas";
 
+const API_BASE_URL = "http://localhost:3000";
+
+const obtenerMediaUrl = (mediaUrl) => {
+  if (
+    typeof mediaUrl !== "string" ||
+    mediaUrl.trim() === "" ||
+    mediaUrl.startsWith("blob:")
+  ) {
+    return null;
+  }
+
+  if (mediaUrl.startsWith("http://") || mediaUrl.startsWith("https://")) {
+    return mediaUrl;
+  }
+
+  return `${API_BASE_URL}${mediaUrl.startsWith("/") ? "" : "/"}${mediaUrl}`;
+};
+
+const obtenerTipoMedia = (mediaUrl) => {
+  if (typeof mediaUrl !== "string") return null;
+
+  const extension = mediaUrl.split("?")[0].split(".").pop()?.toLowerCase();
+  const extensionesVideo = ["mp4", "webm"];
+  const extensionesImagen = ["jpg", "jpeg", "png", "gif", "webp"];
+
+  if (extensionesVideo.includes(extension)) return "video";
+  if (extensionesImagen.includes(extension)) return "image";
+  return null;
+};
+
 function RutinaDetalle() {
   const navigate = useNavigate();
   const { id } = useParams();
 
-  const tieneMediaValida = (media) =>
-    typeof media === "string" &&
-    media.trim() !== "" &&
-    !media.startsWith("blob:");
+  const tieneMediaValida = (mediaUrl) =>
+    typeof mediaUrl === "string" &&
+    mediaUrl.trim() !== "" &&
+    !mediaUrl.startsWith("blob:");
 
   const rutina = useMemo(() => {
     const rutinas = obtenerRutinas();
@@ -71,7 +101,18 @@ function RutinaDetalle() {
           <h5 className="text-uppercase text-secondary">{key}</h5>
           <div className="row g-3 mt-3">
             {items.map((item, index) => (
-              <div className="col-md-4 col-sm-6" key={`${key}-${index}`}>
+              <div
+                className="col-md-4 col-sm-6"
+                key={`${key}-${index}`}
+              >
+                {console.log("Movimiento de rutina:", item)}
+                {console.log("mediaUrl:", item.mediaUrl)}
+                {(() => {
+                  const urlCompleta = obtenerMediaUrl(item.mediaUrl);
+                  const tipoMedia = obtenerTipoMedia(item.mediaUrl);
+                  console.log("URL multimedia:", urlCompleta);
+
+                  return (
                 <div
                   className="rounded overflow-hidden h-100"
                   style={{
@@ -79,20 +120,18 @@ function RutinaDetalle() {
                     background: "#1a1a1a",
                   }}
                 >
-                  {tieneMediaValida(item.media) &&
-                  item.mediaType?.startsWith("video") ? (
+                  {tieneMediaValida(item.mediaUrl) && tipoMedia === "video" ? (
                     <video
                       className="w-100"
                       style={{ maxHeight: 220, objectFit: "cover" }}
                       controls
-                      src={item.media}
+                      src={urlCompleta}
                     />
-                  ) : tieneMediaValida(item.media) &&
-                    item.mediaType?.startsWith("image") ? (
+                  ) : tieneMediaValida(item.mediaUrl) && tipoMedia === "image" ? (
                     <img
                       className="w-100"
                       style={{ maxHeight: 220, objectFit: "cover" }}
-                      src={item.media}
+                      src={urlCompleta}
                       alt={item.nombre}
                     />
                   ) : (
@@ -111,6 +150,8 @@ function RutinaDetalle() {
                     </p>
                   </div>
                 </div>
+                  );
+                })()}
               </div>
             ))}
           </div>
