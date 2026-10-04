@@ -1,9 +1,22 @@
-import { useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { disciplinas } from "../data/disciplinas";
 import { obtenerRutinas } from "../data/rutinas";
+import "./RutinaDetalle.css";
 
 const API_BASE_URL = "http://localhost:3000";
+const ESTRUCTURA_STORAGE_PREFIX = "rutina-estructura-";
+
+const obtenerEstructuraGuardada = (rutinaId) => {
+  if (typeof window === "undefined") return "";
+
+  return localStorage.getItem(`${ESTRUCTURA_STORAGE_PREFIX}${rutinaId}`) || "";
+};
+
+const guardarEstructura = (rutinaId, estructura) => {
+  if (typeof window === "undefined") return;
+
+  localStorage.setItem(`${ESTRUCTURA_STORAGE_PREFIX}${rutinaId}`, estructura);
+};
 
 const obtenerMediaUrl = (mediaUrl) => {
   if (
@@ -36,6 +49,13 @@ const obtenerTipoMedia = (mediaUrl) => {
 function RutinaDetalle() {
   const navigate = useNavigate();
   const { id } = useParams();
+  const [estructuraSesion, setEstructuraSesion] = useState(() =>
+    obtenerEstructuraGuardada(id),
+  );
+
+  useEffect(() => {
+    setEstructuraSesion(obtenerEstructuraGuardada(id));
+  }, [id]);
 
   const tieneMediaValida = (mediaUrl) =>
     typeof mediaUrl === "string" &&
@@ -46,11 +66,6 @@ function RutinaDetalle() {
     const rutinas = obtenerRutinas();
     return rutinas.find((item) => String(item.id) === String(id)) || null;
   }, [id]);
-
-  const disciplina = useMemo(
-    () => disciplinas.find((item) => item.slug === rutina?.disciplinaSlug),
-    [rutina?.disciplinaSlug],
-  );
 
   if (!rutina) {
     return (
@@ -92,71 +107,76 @@ function RutinaDetalle() {
         </div>
       )}
 
-      {Object.entries(rutina.etapas || {}).map(([key, items]) => (
-        <div
-          key={key}
-          className="mt-4 p-3"
-          style={{ background: "transparent" }}
-        >
-          <h5 className="text-uppercase text-secondary">{key}</h5>
-          <div className="row g-3 mt-3">
-            {items.map((item, index) => (
-              <div
-                className="col-md-4 col-sm-6"
-                key={`${key}-${index}`}
-              >
-                {console.log("Movimiento de rutina:", item)}
-                {console.log("mediaUrl:", item.mediaUrl)}
-                {(() => {
+      <div className="rutina-detalle-layout">
+        <section className="rutina-detalle-movimientos">
+          {Object.entries(rutina.etapas || {}).map(([key, items]) => (
+            <div key={key} className="mt-4 p-3 rutina-detalle-etapa">
+              <h5 className="text-uppercase text-secondary">{key}</h5>
+              <div className="row g-3 mt-3">
+                {items.map((item, index) => {
                   const urlCompleta = obtenerMediaUrl(item.mediaUrl);
                   const tipoMedia = obtenerTipoMedia(item.mediaUrl);
-                  console.log("URL multimedia:", urlCompleta);
 
                   return (
-                <div
-                  className="rounded overflow-hidden h-100"
-                  style={{
-                    border: `2px solid ${disciplina?.color || "#ffffff"}`,
-                    background: "#1a1a1a",
-                  }}
-                >
-                  {tieneMediaValida(item.mediaUrl) && tipoMedia === "video" ? (
-                    <video
-                      className="w-100"
-                      style={{ maxHeight: 220, objectFit: "cover" }}
-                      controls
-                      src={urlCompleta}
-                    />
-                  ) : tieneMediaValida(item.mediaUrl) && tipoMedia === "image" ? (
-                    <img
-                      className="w-100"
-                      style={{ maxHeight: 220, objectFit: "cover" }}
-                      src={urlCompleta}
-                      alt={item.nombre}
-                    />
-                  ) : (
-                    <div
-                      className="d-flex align-items-center justify-content-center"
-                      style={{ height: 220, background: "#222" }}
-                    >
-                      <span className="text-secondary">Sin media</span>
-                    </div>
-                  )}
+                    <div className="col-md-4 col-sm-6" key={`${key}-${index}`}>
+                      <div className="rutina-detalle-media-card">
+                        {tieneMediaValida(item.mediaUrl) &&
+                        tipoMedia === "video" ? (
+                          <video
+                            className="w-100 rutina-detalle-media"
+                            controls
+                            src={urlCompleta}
+                          />
+                        ) : tieneMediaValida(item.mediaUrl) &&
+                          tipoMedia === "image" ? (
+                          <img
+                            className="w-100 rutina-detalle-media"
+                            src={urlCompleta}
+                            alt={item.nombre}
+                          />
+                        ) : (
+                          <div className="rutina-detalle-media rutina-detalle-sin-media">
+                            <span className="text-secondary">Sin media</span>
+                          </div>
+                        )}
 
-                  <div className="p-3">
-                    <h6 className="mb-1">{item.nombre}</h6>
-                    <p className="text-secondary mb-0 small">
-                      {item.tipo || "Movimiento"}
-                    </p>
-                  </div>
-                </div>
+                        <div className="p-3">
+                          <h6 className="mb-1">{item.nombre}</h6>
+                          <p className="text-secondary mb-0 small">
+                            {item.tipo || "Movimiento"}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
                   );
-                })()}
+                })}
               </div>
-            ))}
-          </div>
-        </div>
-      ))}
+            </div>
+          ))}
+        </section>
+
+        <aside className="rutina-detalle-estructura">
+          <h5 className="rutina-detalle-estructura-titulo">
+            Estructura de la sesión
+          </h5>
+          <textarea
+            className="rutina-detalle-textarea"
+            value={estructuraSesion}
+            onChange={(event) => {
+              const nuevaEstructura = event.target.value;
+              setEstructuraSesion(nuevaEstructura);
+              guardarEstructura(id, nuevaEstructura);
+            }}
+            placeholder={`Calentamiento y estiramientos
+  13 minutos (cuello, hombros, codos, muñecas, cadera, rodillas, tobillos)
+
+Entrenamiento
+  Movimiento de pies (3 rounds)
+  Sombra (3 rounds)`}
+            aria-label="Estructura de la sesión"
+          />
+        </aside>
+      </div>
     </div>
   );
 }
