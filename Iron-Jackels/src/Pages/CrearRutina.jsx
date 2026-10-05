@@ -5,6 +5,7 @@ import {
   guardarRutina,
   obtenerRutinas,
 } from "../data/rutinas";
+import { API_URL } from "../config/api";
 
 const etapas = [
   { key: "calentamiento", label: "Calentamiento" },
@@ -49,8 +50,8 @@ function CrearRutina() {
 
       try {
         const [movimientosResponse, disciplinasResponse] = await Promise.all([
-          fetch("http://localhost:3000/api/movimientos"),
-          fetch("http://localhost:3000/api/disciplinas"),
+          fetch(`${API_URL}/movimientos`),
+          fetch(`${API_URL}/disciplinas`),
         ]);
         if (!movimientosResponse.ok || !disciplinasResponse.ok) {
           throw new Error("No se pudieron cargar los datos de movimientos");

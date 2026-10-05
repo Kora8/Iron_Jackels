@@ -11,7 +11,7 @@ import rutinasRoutes from "./routes/rutinas.routes.js";
 dotenv.config();
 
 const app = express();
-const PORT = 3000;
+const PORT = process.env.PORT || 3000;
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 app.use(cors());
@@ -49,5 +49,5 @@ app.get("/api/prueba-db", async (req, res) => {
 });
 
 app.listen(PORT, () => {
-  console.log(`Servidor Iron Jackals ejecutándose en http://localhost:${PORT}`);
+  console.log(`Servidor Iron Jackals ejecutándose en el puerto ${PORT}`);
 });

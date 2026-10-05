@@ -1,7 +1,6 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-
-const API_URL = "http://localhost:3000/api";
+import { API_URL, SERVER_URL } from "../config/api";
 
 function ListaMovimientos() {
   const navigate = useNavigate();
@@ -34,7 +33,7 @@ function ListaMovimientos() {
   const disciplina = disciplinas.find((item) => item.slug === slug);
 
   const mediaUrl = (media) =>
-    media?.startsWith("http") ? media : `http://localhost:3000${media}`;
+    media?.startsWith("http") ? media : `${SERVER_URL}${media}`;
 
   return (
     <div className="container py-4 text-light">

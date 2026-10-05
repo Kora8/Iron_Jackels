@@ -2,8 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { eliminarRutina, obtenerRutinas } from "../data/rutinas";
 import "./RutinaDetalle.css";
-
-const API_BASE_URL = "http://localhost:3000";
+import { SERVER_URL } from "../config/api";
 const ESTRUCTURA_STORAGE_PREFIX = "rutina-estructura-";
 
 const obtenerEstructuraGuardada = (rutinaId) => {
@@ -31,7 +30,7 @@ const obtenerMediaUrl = (mediaUrl) => {
     return mediaUrl;
   }
 
-  return `${API_BASE_URL}${mediaUrl.startsWith("/") ? "" : "/"}${mediaUrl}`;
+  return `${SERVER_URL}${mediaUrl.startsWith("/") ? "" : "/"}${mediaUrl}`;
 };
 
 const obtenerTipoMedia = (mediaUrl) => {

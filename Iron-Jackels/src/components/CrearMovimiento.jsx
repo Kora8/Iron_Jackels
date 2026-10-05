@@ -2,8 +2,7 @@ import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 
 import Select from "./Select";
-
-const API_URL = "http://localhost:3000/api";
+import { API_URL } from "../config/api";
 
 function CrearMovimiento() {
   const navigate = useNavigate();

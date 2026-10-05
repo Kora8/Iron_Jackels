@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 
 import CardDisciplina from "./../components/CardDisciplina";
+import { API_URL } from "../config/api";
 
 function Home() {
   const navigate = useNavigate();
@@ -15,7 +16,7 @@ function Home() {
     const obtenerDisciplinas = async () => {
       try {
         setCargando(true);
-        const response = await fetch("http://localhost:3000/api/disciplinas");
+        const response = await fetch(`${API_URL}/disciplinas`);
 
         if (!response.ok) {
           throw new Error(
