@@ -1,0 +1,12 @@
+# Backend
+/Back/uploads/
+/Back/node_modules/
+
+# Frontend
+/Iron-Jackels/node_modules/
+/Iron-Jackels/dist/
+
+# Environment files
+.env
+.env.*
+!.env.example
