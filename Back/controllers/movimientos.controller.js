@@ -1,5 +1,5 @@
 import pool from "../database.js";
-import { unlink } from "node:fs/promises";
+import cloudinary from "../config/cloudinary.js";
 
 const seleccionarMovimiento = `
   SELECT
@@ -58,7 +58,7 @@ export const obtenerMovimiento = async (req, res) => {
 };
 
 export const crearMovimiento = async (req, res) => {
-  let mediaPath;
+  let resultadoSubida;
   try {
     const {
       nombre,
@@ -77,27 +77,54 @@ export const crearMovimiento = async (req, res) => {
       !modoEntrenamientoId ||
       !req.file
     ) {
-      return res
-        .status(400)
-        .json({
-          ok: false,
-          mensaje: "Todos los campos y la multimedia son obligatorios",
-        });
+      return res.status(400).json({
+        ok: false,
+        mensaje: "Todos los campos y la multimedia son obligatorios",
+      });
     }
 
-    mediaPath = `/uploads/movimientos/${req.file.filename}`;
-    const [result] = await pool.query(
-      "INSERT INTO movimientos (nombre, disciplina_id, tipo_movimiento_id, finalidad_id, dificultad_id, modo_entrenamiento_id, media_url) VALUES (?, ?, ?, ?, ?, ?, ?)",
-      [
-        nombre.trim(),
-        disciplinaId,
-        tipoMovimientoId,
-        finalidadId,
-        dificultadId,
-        modoEntrenamientoId,
-        mediaPath,
-      ],
-    );
+    resultadoSubida = await new Promise((resolve, reject) => {
+      const uploadStream = cloudinary.uploader.upload_stream(
+        {
+          resource_type: "auto",
+          folder: "iron-jackals/movimientos",
+        },
+        (error, result) => {
+          if (error) return reject(error);
+          resolve(result);
+        },
+      );
+      uploadStream.end(req.file.buffer);
+    });
+
+    let result;
+    try {
+      [result] = await pool.query(
+        "INSERT INTO movimientos (nombre, disciplina_id, tipo_movimiento_id, finalidad_id, dificultad_id, modo_entrenamiento_id, media_url) VALUES (?, ?, ?, ?, ?, ?, ?)",
+        [
+          nombre.trim(),
+          disciplinaId,
+          tipoMovimientoId,
+          finalidadId,
+          dificultadId,
+          modoEntrenamientoId,
+          resultadoSubida.secure_url,
+        ],
+      );
+    } catch (error) {
+      await cloudinary.uploader
+        .destroy(resultadoSubida.public_id, {
+          resource_type: resultadoSubida.resource_type,
+        })
+        .catch((errorEliminacion) =>
+          console.error(
+            "Error al eliminar multimedia de Cloudinary:",
+            errorEliminacion,
+          ),
+        );
+      throw error;
+    }
+
     const [movimientos] = await pool.query(
       `${seleccionarMovimiento} WHERE m.id = ?`,
       [result.insertId],
@@ -105,9 +132,6 @@ export const crearMovimiento = async (req, res) => {
     res.status(201).json({ ok: true, movimiento: movimientos[0] });
   } catch (error) {
     console.error("Error al crear movimiento:", error);
-    if (req.file) {
-      await unlink(req.file.path).catch(() => {});
-    }
     res
       .status(500)
       .json({ ok: false, mensaje: "No se pudo crear el movimiento" });
