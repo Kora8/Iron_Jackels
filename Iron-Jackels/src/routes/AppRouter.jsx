@@ -20,6 +20,7 @@ function AppRouter() {
       <Route path="/disciplinas/:slug/lista" element={<ListaMovimientos />} />
       <Route path="/disciplinas/:slug/rutinas" element={<CrearRutina />} />
       <Route path="/mis-rutinas" element={<MisRutinas />} />
+      <Route path="/rutinas/:id/editar" element={<CrearRutina />} />
       <Route path="/rutinas/:id" element={<RutinaDetalle />} />
     </Routes>
   );

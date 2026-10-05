@@ -1,6 +1,10 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { guardarRutina } from "../data/rutinas";
+import {
+  actualizarRutina,
+  guardarRutina,
+  obtenerRutinas,
+} from "../data/rutinas";
 
 const etapas = [
   { key: "calentamiento", label: "Calentamiento" },
@@ -10,17 +14,33 @@ const etapas = [
 
 function CrearRutina() {
   const navigate = useNavigate();
-  const { slug } = useParams();
-  const [nombreRutina, setNombreRutina] = useState("");
+  const { slug, id } = useParams();
+  const rutinaExistente = id
+    ? obtenerRutinas().find((rutina) => String(rutina.id) === String(id))
+    : null;
+  const disciplinaSlug = rutinaExistente?.disciplinaSlug || slug;
+  const [nombreRutina, setNombreRutina] = useState(
+    () => rutinaExistente?.nombre || "",
+  );
   const [movimientosDisponibles, setMovimientosDisponibles] = useState([]);
+  const [disciplinasDisponibles, setDisciplinasDisponibles] = useState([]);
   const [cargandoMovimientos, setCargandoMovimientos] = useState(true);
   const [errorMovimientos, setErrorMovimientos] = useState("");
-  const [seleccionados, setSeleccionados] = useState([]);
-  const [asignaciones, setAsignaciones] = useState({
+  const [seleccionados, setSeleccionados] = useState(() =>
+    Array.from(
+      new Map(
+        Object.values(rutinaExistente?.etapas || {})
+          .flat()
+          .map((movimiento) => [String(movimiento.id), movimiento]),
+      ).values(),
+    ),
+  );
+  const [asignaciones, setAsignaciones] = useState(() => ({
     calentamiento: [],
     entrenamiento: [],
     acondicionamiento: [],
-  });
+    ...(rutinaExistente?.etapas || {}),
+  }));
 
   useEffect(() => {
     const cargarMovimientos = async () => {
@@ -28,17 +48,46 @@ function CrearRutina() {
       setErrorMovimientos("");
 
       try {
-        const response = await fetch("http://localhost:3000/api/movimientos");
-        if (!response.ok) {
-          throw new Error(`La API respondió con estado ${response.status}`);
+        const [movimientosResponse, disciplinasResponse] = await Promise.all([
+          fetch("http://localhost:3000/api/movimientos"),
+          fetch("http://localhost:3000/api/disciplinas"),
+        ]);
+        if (!movimientosResponse.ok || !disciplinasResponse.ok) {
+          throw new Error("No se pudieron cargar los datos de movimientos");
         }
 
-        const data = await response.json();
-        if (!Array.isArray(data)) {
+        const [movimientosData, disciplinasData] = await Promise.all([
+          movimientosResponse.json(),
+          disciplinasResponse.json(),
+        ]);
+        if (
+          !Array.isArray(movimientosData) ||
+          !Array.isArray(disciplinasData)
+        ) {
           throw new Error("La respuesta de movimientos no es un array");
         }
 
-        setMovimientosDisponibles(data);
+        setDisciplinasDisponibles(disciplinasData);
+        setMovimientosDisponibles(
+          movimientosData.map((movimiento) => {
+            const disciplina = disciplinasData.find(
+              (item) => item.slug === movimiento.disciplinaSlug,
+            );
+            return {
+              ...movimiento,
+              disciplinaNombre:
+                disciplina?.nombre ||
+                movimiento.disciplinaNombre ||
+                "Disciplina",
+              disciplinaOrigen:
+                movimiento.disciplinaOrigen ||
+                disciplina?.nombre ||
+                movimiento.disciplinaNombre ||
+                "MMA",
+              disciplinaColor: disciplina?.color || "#bbbbbb",
+            };
+          }),
+        );
       } catch (error) {
         console.error("Error al cargar movimientos:", error);
         setErrorMovimientos("No se pudieron cargar los movimientos.");
@@ -51,21 +100,19 @@ function CrearRutina() {
     cargarMovimientos();
   }, []);
 
-  const movimientos = movimientosDisponibles
-    .filter((movimiento) => {
-      if (slug === "mma") return true;
-      return movimiento.disciplinaSlug === slug;
-    })
-    .map((movimiento) => {
-      if (!movimiento.disciplinaOrigen && movimiento.disciplinaNombre) {
-        return {
-          ...movimiento,
-          disciplinaOrigen: movimiento.disciplinaNombre,
-        };
-      }
-
-      return movimiento;
-    });
+  const slugEjercicioFisico = disciplinasDisponibles.find(
+    (disciplina) =>
+      disciplina.nombre
+        ?.normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .toLowerCase() === "ejercicio fisico",
+  )?.slug;
+  const movimientos = movimientosDisponibles.filter(
+    (movimiento) =>
+      disciplinaSlug === "mma" ||
+      movimiento.disciplinaSlug === disciplinaSlug ||
+      movimiento.disciplinaSlug === slugEjercicioFisico,
+  );
 
   const agregarMovimiento = (movimiento) => {
     if (seleccionados.some((item) => item.id === movimiento.id)) return;
@@ -101,6 +148,15 @@ function CrearRutina() {
     }));
   };
 
+  const quitarMovimiento = (etapaKey, index) => {
+    setAsignaciones((prev) => ({
+      ...prev,
+      [etapaKey]: prev[etapaKey].filter(
+        (_, movimientoIndex) => movimientoIndex !== index,
+      ),
+    }));
+  };
+
   const guardar = () => {
     if (!nombreRutina.trim()) return;
 
@@ -113,19 +169,41 @@ function CrearRutina() {
       ),
     );
 
-    guardarRutina({
+    const datosRutina = {
       nombre: nombreRutina,
-      disciplinaSlug: slug,
+      disciplinaSlug,
       artesMarciales,
       etapas: asignaciones,
-    });
+    };
+
+    if (id) {
+      actualizarRutina(id, datosRutina);
+      navigate(`/rutinas/${id}`);
+      return;
+    }
+
+    guardarRutina(datosRutina);
 
     navigate(`/disciplinas/${slug}/lista`);
   };
 
+  if (id && !rutinaExistente) {
+    return (
+      <div className="container py-4 text-light">
+        <h3>No se encontró la rutina</h3>
+        <button
+          className="btn btn-outline-light mt-3"
+          onClick={() => navigate("/mis-rutinas")}
+        >
+          Volver a Mis rutinas
+        </button>
+      </div>
+    );
+  }
+
   return (
     <div className="container py-4 text-light">
-      <h2 className="mb-4">Crear rutina</h2>
+      <h2 className="mb-4">{id ? "Editar rutina" : "Crear rutina"}</h2>
 
       <div className="mb-4">
         <label className="form-label">Nombre de la rutina</label>
@@ -148,12 +226,31 @@ function CrearRutina() {
               <div className="col-md-4" key={movimiento.id}>
                 <div className="border rounded p-3">
                   <strong>{movimiento.nombre}</strong>
+                  <div className="my-2">
+                    <span
+                      className="badge rounded-pill border text-uppercase"
+                      style={{
+                        color: movimiento.disciplinaColor,
+                        borderColor: movimiento.disciplinaColor,
+                        backgroundColor: `${movimiento.disciplinaColor}20`,
+                      }}
+                    >
+                      {movimiento.disciplinaNombre}
+                    </span>
+                  </div>
                   <p className="text-secondary small mb-2">{movimiento.tipo}</p>
                   <button
                     className="btn btn-outline-light btn-sm"
                     onClick={() => agregarMovimiento(movimiento)}
+                    disabled={seleccionados.some(
+                      (item) => String(item.id) === String(movimiento.id),
+                    )}
                   >
-                    Añadir
+                    {seleccionados.some(
+                      (item) => String(item.id) === String(movimiento.id),
+                    )
+                      ? "Añadido"
+                      : "Añadir"}
                   </button>
                 </div>
               </div>
@@ -186,17 +283,38 @@ function CrearRutina() {
                 >
                   <span className="badge bg-secondary">{index + 1}</span>
                   <span>{movimiento.nombre}</span>
+                  <span
+                    className="badge rounded-pill border text-uppercase"
+                    style={{
+                      color: movimiento.disciplinaColor || "#bbbbbb",
+                      borderColor: movimiento.disciplinaColor || "#bbbbbb",
+                      backgroundColor: `${movimiento.disciplinaColor || "#bbbbbb"}20`,
+                    }}
+                  >
+                    {movimiento.disciplinaNombre ||
+                      movimiento.disciplinaOrigen ||
+                      "Disciplina"}
+                  </span>
                   <button
                     className="btn btn-sm btn-outline-light"
                     onClick={() => moverArriba(etapa.key, index)}
+                    aria-label={`Mover ${movimiento.nombre} hacia arriba`}
                   >
                     ↑
                   </button>
                   <button
                     className="btn btn-sm btn-outline-light"
                     onClick={() => moverAbajo(etapa.key, index)}
+                    aria-label={`Mover ${movimiento.nombre} hacia abajo`}
                   >
                     ↓
+                  </button>
+                  <button
+                    className="btn btn-sm btn-outline-danger"
+                    onClick={() => quitarMovimiento(etapa.key, index)}
+                    aria-label={`Quitar ${movimiento.nombre} de ${etapa.label}`}
+                  >
+                    Quitar
                   </button>
                 </div>
               ))}
@@ -207,7 +325,7 @@ function CrearRutina() {
 
       <div className="d-flex gap-2">
         <button className="btn btn-success" onClick={guardar}>
-          Guardar rutina
+          {id ? "Guardar cambios" : "Guardar rutina"}
         </button>
         <button className="btn btn-outline-light" onClick={() => navigate(-1)}>
           Cancelar

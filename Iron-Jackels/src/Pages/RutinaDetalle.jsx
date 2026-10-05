@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { obtenerRutinas } from "../data/rutinas";
+import { eliminarRutina, obtenerRutinas } from "../data/rutinas";
 import "./RutinaDetalle.css";
 
 const API_BASE_URL = "http://localhost:3000";
@@ -67,6 +67,15 @@ function RutinaDetalle() {
     return rutinas.find((item) => String(item.id) === String(id)) || null;
   }, [id]);
 
+  const confirmarEliminacion = () => {
+    const confirmar = window.confirm(
+      "¿Estás seguro de que deseas eliminar esta rutina? Esta acción no se puede deshacer.",
+    );
+    if (!confirmar) return;
+    eliminarRutina(id);
+    navigate("/mis-rutinas");
+  };
+
   if (!rutina) {
     return (
       <div className="container py-4 text-light">
@@ -83,12 +92,26 @@ function RutinaDetalle() {
 
   return (
     <div className="container py-4 text-light">
-      <button
-        className="btn btn-outline-light mb-4"
-        onClick={() => navigate("/mis-rutinas")}
-      >
-        Volver
-      </button>
+      <div className="d-flex flex-wrap gap-2 mb-4">
+        <button
+          className="btn btn-outline-light"
+          onClick={() => navigate("/mis-rutinas")}
+        >
+          Volver
+        </button>
+        <button
+          className="btn btn-outline-info"
+          onClick={() => navigate(`/rutinas/${id}/editar`)}
+        >
+          Editar rutina
+        </button>
+        <button
+          className="btn btn-outline-danger"
+          onClick={confirmarEliminacion}
+        >
+          Eliminar rutina
+        </button>
+      </div>
 
       <h2>{rutina.nombre}</h2>
       <p className="text-secondary">
@@ -142,6 +165,18 @@ function RutinaDetalle() {
 
                         <div className="p-3">
                           <h6 className="mb-1">{item.nombre}</h6>
+                          <span
+                            className="badge rounded-pill border text-uppercase mb-2"
+                            style={{
+                              color: item.disciplinaColor || "#bbbbbb",
+                              borderColor: item.disciplinaColor || "#bbbbbb",
+                              backgroundColor: `${item.disciplinaColor || "#bbbbbb"}20`,
+                            }}
+                          >
+                            {item.disciplinaNombre ||
+                              item.disciplinaOrigen ||
+                              "Disciplina"}
+                          </span>
                           <p className="text-secondary mb-0 small">
                             {item.tipo || "Movimiento"}
                           </p>

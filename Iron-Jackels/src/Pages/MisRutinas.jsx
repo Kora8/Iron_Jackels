@@ -1,10 +1,17 @@
-import { useMemo } from "react";
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { obtenerRutinas } from "../data/rutinas";
+import { eliminarRutina, obtenerRutinas } from "../data/rutinas";
 
 function MisRutinas() {
   const navigate = useNavigate();
-  const rutinas = useMemo(() => obtenerRutinas(), []);
+  const [rutinas, setRutinas] = useState(() => obtenerRutinas());
+
+  const confirmarEliminacion = (rutina) => {
+    const confirmar = window.confirm(
+      "¿Estás seguro de que deseas eliminar esta rutina? Esta acción no se puede deshacer.",
+    );
+    if (confirmar) setRutinas(eliminarRutina(rutina.id));
+  };
 
   return (
     <div className="container py-4 text-light">
@@ -37,12 +44,26 @@ function MisRutinas() {
                       Disciplina: {rutina.disciplinaSlug || "Sin disciplina"}
                     </p>
                   </div>
-                  <button
-                    className="btn btn-outline-light btn-sm"
-                    onClick={() => navigate(`/rutinas/${rutina.id}`)}
-                  >
-                    Ver
-                  </button>
+                  <div className="d-flex flex-wrap gap-2">
+                    <button
+                      className="btn btn-outline-light btn-sm"
+                      onClick={() => navigate(`/rutinas/${rutina.id}`)}
+                    >
+                      Ver
+                    </button>
+                    <button
+                      className="btn btn-outline-info btn-sm"
+                      onClick={() => navigate(`/rutinas/${rutina.id}/editar`)}
+                    >
+                      Editar rutina
+                    </button>
+                    <button
+                      className="btn btn-outline-danger btn-sm"
+                      onClick={() => confirmarEliminacion(rutina)}
+                    >
+                      Eliminar
+                    </button>
+                  </div>
                 </div>
               </div>
             </div>
